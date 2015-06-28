@@ -70,3 +70,23 @@ class SeriesQuery(BaseQuery):
 
     def post(self, data):
         return self.make_post_request(self.base_url, data)
+
+class SearchQuery(BaseQuery):
+
+    base_url = base_skeleton.format(host=host, queryType='search',
+        api_key=api_key)
+
+    def make_url(self, search_term, search_value, page_num=None, rows_per_page=None):
+        url_skeleton= '{base}&search_term={term}&search_value="{value}"'
+        url = url_skeleton.format(base=self.base_url,term=search_term,value=search_value)       
+        if page_num:
+            url += "&page_num={0}".format(str(page_num))
+        if rows_per_page : 
+            url += "&rows_per_page={0}".format(str(rows_per_page))
+        return url 
+
+    def get(self, search_term, search_value, page_num=None, rows_per_page=None):
+        url = self.make_url(search_term, search_value, page_num, rows_per_page)
+        r = self.make_get_request(url)
+        return r 
+
