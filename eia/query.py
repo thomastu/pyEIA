@@ -52,21 +52,6 @@ class CategoryQuery(BaseQuery):
     def post(self, data):
         return self.make_post_request(self.base_url, data)
 
-    def get_path_ids(self, category_id, path=[]):
-        if category_id == 371:
-            path.append(category_id)
-            path.reverse()
-            return path
-        else:
-            r = self.get(category_id)
-            path.append(r['category']['parent_category_id'])
-            return self.get_path_ids(path[-1], path)
-
-    def get_path_names(self, category_id):
-        path_ids = self.get_path_ids(category_id)
-        f = lambda x : self.get(x)['category']['name']
-        return map(f, path_ids)
-
 class SeriesQuery(BaseQuery):
 
     base_url = base_skeleton.format(host = host, queryType = 'series', 

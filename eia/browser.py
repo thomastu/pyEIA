@@ -1,6 +1,6 @@
 from .query import CategoryQuery, SeriesQuery
 
-class browser:
+class categoryBrowser:
     """
     Creates category and series queries to make a command-line
     browsable and easily scriptable api interface.  The browser interface
@@ -9,36 +9,47 @@ class browser:
 
     def __init__(self, **kwargs):
         """
-        ---------- Optional Arguments ----------
         """
-
-        self.category = CategoryQuery()
-        self.series = SeriesQuery()
-        self.silent = kwargs.get('silent', True)
-        self.category_ids = {}
-        self.series_ids = {}
-        self.flags = []
-        self.display_menu(silent = self.silent)
+        self.query = CategoryQuery()
 
     def __str__(self):
         """
         """
-        return 
+        pass
 
     def __repr__(self):
-        base = '<EIA Browser : {s}>'
-        return base.format(s = str(self))
+        pass
 
-    def display_menu(self):
-        """
+    def browse(self, category_id):
+        category_id = self._validate_category_id(category_id)
+        response = self.query.get(category_id)
+        self._set_response_attributes(response)
+
+    def _validate_category_id(self, category_id):
+        return str(category_id)
+
+    def _set_response_attributes(self, response):
+        attributes = ['name', 'path', 'category_id']
+        for attr in attributes:
+            method = "_get_{0}".format(attr)
+            value = getattr(self, method)(response)
+            setattr(self, attr, value)
         
-        """
-        pass 
+    def _get_name(self, response):
+        return response['category']['name']
 
-    def create_menu(self):
-        """
-        """
-        r = self.response 
-        prompt = \
-        '\nPlease select a {qtype} from {name} (ID : {id} ) : \n\n'.format(\
-            qtype = query_type, 'name' = self.category_name, 'id'  = self.category_id)
+    def _get_category_id(self, response):
+        return response['category']['category_id']
+
+    def _get_path(self, reponse, path=[]):
+        category_id = self._get_category_id(response)
+        parent_category_id = response['category']['parent_category_id']
+        path.append(category_id)
+        if category_id == '371':
+            f = lambda x : self._get_name(self.query.get(x))
+            path.reverse()
+            return map(f, path)
+        else:
+            response = self.query.get(parent_category_id)
+            return self._get_path(response, path)
+
