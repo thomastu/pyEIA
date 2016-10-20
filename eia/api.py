@@ -235,6 +235,9 @@ class Search(BaseQuery):
 
     endpoint = "search/"
 
+    def parse(self, q, *args, **kwargs):
+        q.put(self.get(*args, **kwargs)['response']['docs'])
+
     def query(self, search_term, search_value,
               rows_per_page=10, page_num=1, **kwargs):
         """
@@ -262,21 +265,25 @@ class Search(BaseQuery):
             total = r['response']['numFound']
             # Chunk by 5000's for reliability/reasonable speed
             pages = int(np.ceil(total/5000.))
-            results = []
+            params = {"search_term" : t, "search_value" : v}
+            params.update(kwargs)
+            threads = []
+            q = Queue()
             for page in range(0, pages):
                 rows = 5000
                 first = page*5000
                 if first + 5000 > total:
                     rows = total - first
-                try:
-                    r = self.get(search_term = t, search_value = v, page_num=page, rows_per_page = rows, **kwargs)
-                    results.extend(r['response']['docs'])
-                except Exception as e:
-                    print(e)
-                    print(r)
-                    print(page)
-                    print(rows)
-                    print(first)
+                page_params = dict(params)
+                page_params.update({"page_num" : page, "rows_per_page" : rows})
+                t = Thread(target=self.parse, args=(q,), kwargs=page_params)
+                t.daemon = True
+                t.start()
+                threads.append(t)
+            map(lambda x : x.join(), threads)
+            results = [q.get() for _ in threads]
+            results = [i for chunk in results for i in chunk]
+
         else: # limit search results, paginate elsewhere
             r = self.get(search_term = t, search_value = v, page_num=page_num, rows_per_page = rows_per_page, **kwargs)
             results = r['response']['docs']
