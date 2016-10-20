@@ -74,7 +74,10 @@ class Series(BaseQuery):
 
     def parse(self, q, series_id, **kwargs):
         """Thread target to put results on a queue."""
-        q.put(self.post(series_id = series_id, **kwargs))
+        if len(series_id) + len(self.base_url) >= 1800:
+            q.put(self.post(series_id = series_id, **kwargs))
+        else:
+            q.put(self.get(series_id=series_id, **kwargs))
 
     def query(self, *series_ids, **kwargs):
         q = Queue()
@@ -157,7 +160,11 @@ class SeriesCategory(BaseQuery):
 
     def parse(self, q, series_id, **kwargs):
         """Thread target to put results on a queue."""
-        q.put(self.post(series_id = series_id, **kwargs))
+        # IMPROVEMENT : calculate dry-run url len
+        if len(series_id) + len(self.base_url) >= 1800:
+            q.put(self.post(series_id = series_id, **kwargs))
+        else:
+            q.put(self.get(series_id=series_id, **kwargs))
 
     def query(self, *series_ids, **kwargs):
         q = Queue()
@@ -171,6 +178,16 @@ class SeriesCategory(BaseQuery):
         map(lambda x : x.join(), threads)
         data = filter(lambda x : 'series_categories' in x, [q.get() for _ in threads])
         return [s for d in data for s in d['series_categories']]
+
+    def query_df(self, *series_ids, **kwargs):
+        results = self.query(*series_ids, **kwargs)
+        output = pd.DataFrame()
+        for r in results:
+            df = pd.DataFrame(r['categories'])
+            df['series_id'] = r['series_id']
+            output = pd.concat([output, df], ignore_index=True)
+        return output
+
 
 class Updates(BaseQuery):
 
@@ -210,6 +227,10 @@ class Updates(BaseQuery):
             [q.get() for _ in threads])
         return [s for d in data for s in d['updates']]
 
+    def query_df(self, *args, **kwargs):
+        return pd.DataFrame(self.query(*args, **kwargs))
+
+
 class Search(BaseQuery):
 
     endpoint = "search/"
@@ -246,9 +267,16 @@ class Search(BaseQuery):
                 rows = 5000
                 first = page*5000
                 if first + 5000 > total:
-                    rows = rows - first
-                r = self.get(search_term = t, search_value = v, page_num=page, rows_per_page = rows, **kwargs)
-                results.extend(r['response']['docs'])
+                    rows = total - first
+                try:
+                    r = self.get(search_term = t, search_value = v, page_num=page, rows_per_page = rows, **kwargs)
+                    results.extend(r['response']['docs'])
+                except Exception as e:
+                    print(e)
+                    print(r)
+                    print(page)
+                    print(rows)
+                    print(first)
         else: # limit search results, paginate elsewhere
             r = self.get(search_term = t, search_value = v, page_num=page_num, rows_per_page = rows_per_page, **kwargs)
             results = r['response']['docs']
@@ -271,3 +299,6 @@ class Search(BaseQuery):
             # else : assume user has read documentation and is feeding in
             # solr friendly query
         return t, v
+
+    def query_df(self, *args, **kwargs):
+        return pd.DataFrame(self.query(*args, **kwargs))
