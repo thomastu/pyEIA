@@ -3,6 +3,8 @@ from __future__ import unicode_literals
 
 from eia import browser
 
+# YOU WILL NEED TO CHANGE THE APIKEY BELOW
+
 if __name__ == '__main__':
 
     # Collect Data
@@ -30,5 +32,5 @@ if __name__ == '__main__':
     delta = data.groupby(level = 0, as_index=False).apply(
         lambda x : x['value'] - reference['value']
         ).reset_index(level=0, drop=True)
-        )
+
     data['delta_reference'] = delta
