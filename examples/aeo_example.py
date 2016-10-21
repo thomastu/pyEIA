@@ -26,6 +26,7 @@ if __name__ == '__main__':
     # This is a DataFrame whose columns are the output fields of the Series API
     # as well as any additional meta information you may have attached.
 
+    # Now we can do some quick analysis or exploratory work!
     # Get a quick delta between AEO scenarios against the reference case
     data.set_index(['scenario', 'period'], inplace=True)
     reference = data.loc['Reference']
