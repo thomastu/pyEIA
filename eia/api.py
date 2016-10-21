@@ -264,15 +264,16 @@ class Search(BaseQuery):
             r = self.get(search_term = t, search_value = v, page_num=1, rows_per_page = 1, **kwargs)
             total = r['response']['numFound']
             # Chunk by 5000's for reliability/reasonable speed
-            pages = int(np.ceil(total/5000.))
+            chunksize = 7500
+            pages = int(np.ceil(total/float(chunksize)))
             params = {"search_term" : t, "search_value" : v}
             params.update(kwargs)
             threads = []
             q = Queue()
             for page in range(0, pages):
-                rows = 5000
-                first = page*5000
-                if first + 5000 > total:
+                rows = chunksize
+                first = page*rows
+                if first + rows > total:
                     rows = total - first
                 page_params = dict(params)
                 page_params.update({"page_num" : page, "rows_per_page" : rows})
