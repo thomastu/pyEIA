@@ -30,6 +30,7 @@ class Browser(object):
         First element is the immediate parent, not current category.
         """
         history = [self.category_id] # Remember current state
+        yield self
         while int(self.category_id) != int(self.root_category):
             if len(set(history)) != len(history):
                 raise BrowserError(
@@ -40,6 +41,14 @@ class Browser(object):
             history.append(self.category_id)
             yield self
         self.goto(history[0]) # return to where we originally were
+
+
+    @property
+    def pathname(self):
+        """Get full pathname as a single string."""
+        path = map(lambda x: x.name, self.path)
+        path.reverse()
+        return path
 
     def browse(self, category_id=None):
         category_ids= self.parse_category_id(category_id)
@@ -177,6 +186,18 @@ class AEO(Browser):
     """Annual Energy Outlook."""
 
     root_category = 964164
+
+    @property
+    def scenario(self):
+        fullpath = self.pathname
+        if len(fullpath) > 2: return fullpath[2]
+        else: return 'Not currently within a scenario.'
+
+    @property
+    def aeoname(self):
+        fullpath = self.pathname
+        if len(fullpath) > 1 : return fullpath[1]
+        else : return 'Not currently within a scenario'
 
 class CrudeOil(Browser):
     """Crude Oil Imports."""
