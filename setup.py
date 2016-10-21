@@ -16,7 +16,7 @@ setup(
     url='https://github.com/thomastu/pyEIA',
 
     author='Thomas Tu',
-    author_email='thomasthetu@gmail.com
+    author_email='thomasthetu@gmail.com',
 
     license='BSD',
 
