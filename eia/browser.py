@@ -112,29 +112,82 @@ class Browser(object):
 
         raise ValueError("category_id argument must be in childcategories.")
 
-    def _flag(self, series_ids, meta=dict()):
+    def _flag(self, series, meta=dict()):
         """Internal method to add to mark a series for export with some meta.
+
+        Parameters
+        ----------
+        series : dict,
+            an element of a childseries list from Series.query('...')
 
         Note
         ----
         Does not validate that series ids are valid.
         """
-        for s in series_ids:
-            self.flags[s] = meta # Remember, dicts are mutable!! i.e.
-            # self.flag[series_ids[0]] is self.flag[series_ids[1]]
+        meta = self._parse_meta(series, meta)
+        self.flags[series['series_id']] = meta
 
     def flag_re(self, pat, field="name", meta=dict()):
         """
-
+        Parameters
+        ----------
         pat : str,
             Regular expression to search for
         field : str, defaults to "name"
             one of "f", "name", "series_id", "units", "updated"
+        meta : dict,
+            Custom metadata to pass along with data collection.
+            Keys must be either str or callable.
+            If str, values must be json-serializable.
+
+        Example
+        -------
+        .. code-block:: python
+
+            def parse_series_name(series_name):
+                '''Example callable parsing the series name.
+
+                Returns
+                -------
+                dict,
+                    updates ``meta_dict``
+                '''
+                return {"meta_1" : series_name.lower(),
+                        "meta_2" : series_name.upper()}
+
+            meta = {
+                parse_series_name : 'name', # Keys must be a valid fieldname
+                "other" : "foo",
+                }
+
+            browser_instance.flag_re('capacity', 'name', meta=meta)
         """
         lookup = lambda x : re.search(pat, x[field], flags=re.I)
         results = filter(lookup, self.childseries)
-        series = map(lambda x : x['series_id'], results)
-        self._flag(series, meta)
+        for r in results:
+            self._flag(r, meta)
+
+    def _parse_meta(self, series, meta):
+        """Parses a meta-information dictionary with actual values.
+
+        Parameters
+        ----------
+        meta : dict,
+            dict of meta information associated with flagged series_id
+        childseries :
+            pass
+        """
+        meta = dict(meta) # Avoid side effects
+        funcs = filter(callable, meta) # Get any callables
+        valid_names = ["f", "name", "series_id", "units", "updated"]
+        for f in funcs:
+            fieldname = meta.pop(f)
+            if fieldname not in valid_names:
+                raise ValueError("Meta dict must take one of {}".format(
+                    valid_names))
+            m = f(series[fieldname]) # This should return a dictionary
+            meta.update(m)
+        return meta
 
     def export(self):
         """Export data as a pandas DataFrame."""
