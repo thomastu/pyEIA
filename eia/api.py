@@ -80,7 +80,7 @@ class Series(BaseQuery):
             q.put(self.get(series_id=series_id, **kwargs))
 
     def query(self, *series_ids, **kwargs):
-        q = Queue(mazsize=1000)
+        q = Queue(maxsize=1000)
         threads = []
         for c in chunk(list(set(series_ids)), 100):
             t = Thread(target = self.parse,
