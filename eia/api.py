@@ -80,7 +80,7 @@ class Series(BaseQuery):
             q.put(self.get(series_id=series_id, **kwargs))
 
     def query(self, *series_ids, **kwargs):
-        q = Queue()
+        q = Queue(mazsize=1000)
         threads = []
         for c in chunk(list(set(series_ids)), 100):
             t = Thread(target = self.parse,
@@ -167,7 +167,7 @@ class SeriesCategory(BaseQuery):
             q.put(self.get(series_id=series_id, **kwargs))
 
     def query(self, *series_ids, **kwargs):
-        q = Queue()
+        q = Queue(maxsize=1000)
         threads = []
         for c in chunk(list(set(series_ids)), 100):
             t = Thread(target = self.parse,
@@ -207,7 +207,7 @@ class Updates(BaseQuery):
         params = {"category_id" : category_id,
                   "deep" : deep,
                   "rows" : 10000}
-        q = Queue()
+        q = Queue(maxsize=1000)
         threads = []
         for page in range(pages):
             page_params = dict(params)
@@ -269,7 +269,7 @@ class Search(BaseQuery):
             params = {"search_term" : t, "search_value" : v}
             params.update(kwargs)
             threads = []
-            q = Queue()
+            q = Queue(maxsize=1000)
             for page in range(0, pages):
                 rows = chunksize
                 first = page*rows
