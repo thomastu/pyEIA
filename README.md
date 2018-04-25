@@ -1,3 +1,5 @@
+[![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/gschivley/pyEIA/tree/master/master)
+
 # About
 
 The U.S. Energy Information Adminsitration provides an API for access to commonly used datasets for policy makers
