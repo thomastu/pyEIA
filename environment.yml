@@ -1,0 +1,8 @@
+name: pyeia
+dependencies:
+- python=3.6
+- matplotlib
+- numpy
+- pandas>=0.22.0
+- jupyter
+- seaborn
