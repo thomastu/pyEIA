@@ -9,7 +9,10 @@ import requests_cache
 import pandas as pd
 import numpy as np
 
-from urlparse import urljoin
+try:
+    from urlparse import urljoin
+except ModuleNotFoundError:
+    from urllib.parse import urljoin
 from threading import Thread
 from Queue import Queue
 
