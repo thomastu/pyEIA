@@ -14,7 +14,11 @@ try:
 except ModuleNotFoundError:
     from urllib.parse import urljoin
 from threading import Thread
-from Queue import Queue
+
+try:
+    from Queue import Queue
+except ModuleNotFoundError:
+    from queue import Queue
 
 try:
     import simplejson as json
