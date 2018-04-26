@@ -107,7 +107,7 @@ class Browser(object):
                 matches = filter(l, self.childcategories)
             except re.error:
                 continue
-            if len(matches) > 0:
+            if len(list(matches)) > 0:
                 return [self.childcategories[m] for m in matches]
 
         raise ValueError("category_id argument must be in childcategories.")
