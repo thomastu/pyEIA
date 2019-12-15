@@ -3,7 +3,7 @@
 The U.S. Energy Information Adminsitration provides an API for access to commonly used datasets for policy makers
 and researchers. See the [EIA API documentation](http://www.eia.gov/opendata/commands.cfm) for more information.
 
-Warning : This package is a work in progress!
+Warning : This package is a work in progress!  A substantial update is expected in January 2020, with a published version on PyPi.  The author took a break from this domain area, but is returning!  Hoping to have a similar or identical R interface/API as well, but that may be much farther down the pipeline.
 
 # Basic Usage
 
