@@ -17,7 +17,8 @@ class Geoset(BaseQuery):
 
     endpoint = "geoset"
 
-    def __post_init__(self, geoset_id, *regions):
+    def __init__(self, geoset_id: str, *regions: str, api_key: str = None):
+        super().__init__(api_key)
         self.geoset_id = geoset_id
         self.regions = list(regions)
 

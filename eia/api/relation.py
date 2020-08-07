@@ -19,7 +19,8 @@ class Relation(BaseQuery):
 
     endpoint = "relation"
 
-    def __post_init__(self, geoset_id, *regions):
+    def __init__(self, geoset_id, *regions, api_key: str = None):
+        super().__init__(api_key)
         self.geoset_id = geoset_id
         self.regions = list(regions)
 

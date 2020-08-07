@@ -10,7 +10,8 @@ class Category(BaseQuery):
 
     endpoint = "category"
 
-    def __post_init__(self, category_id=None):
+    def __init__(self, category_id: int = None, apikey: str = None):
+        super().__init__(apikey)
         self.category_id = category_id
 
     def to_dict(self) -> dict:

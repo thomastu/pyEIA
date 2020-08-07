@@ -24,12 +24,8 @@ class BaseQuery(abc.ABC):
 
     ROOT = "https://api.eia.gov"
 
-    def __init__(self, *args, apikey: str = None, **kwargs):
+    def __init__(self, apikey: str = None):
         self._configure(apikey)
-        self.__post_init__(*args, **kwargs)
-
-    def __post_init__(self, *args, **kwargs):
-        pass
 
     def _configure(self, apikey: str):
         """Set instance API key, default parameters and base url.

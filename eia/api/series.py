@@ -24,9 +24,8 @@ class Series(BaseQuery):
 
     endpoint = "series"
 
-    def __post_init__(self, *series_ids: str):
-        # Create a structure to send batch requests
-        # The EIA API supports up to 100 series in a single request
+    def __init__(self, *series_ids: str, apikey: str = None):
+        super().__init__(apikey)
         self.series_ids = [";".join(chunk) for chunk in yield_chunks(series_ids, 100)]
 
     async def _get_data(self):
@@ -36,16 +35,21 @@ class Series(BaseQuery):
             response = await self._post(data={"series_id": series_ids})
             yield response
 
-    async def parse(self) -> List[dict]:
+    async def parse(self, key) -> List[dict]:
         """
         Collect one dict per series and drop request metadata.
         """
         data_generator = self._get_data()
         output = []
         async for group in data_generator:
-            for series in group.get("series", []):
+            for series in group.get(key, []):
                 output.append(series)
         return output
+
+    def to_dict(self) -> List[dict]:
+        """Return the input series as a list of dictionaries.
+        """
+        return asyncio.run(self.parse(key="series"))
 
     def to_dataframe(self, include_metadata: bool = True) -> pd.DataFrame:
         """Return the input series as a dataframe.
@@ -53,7 +57,7 @@ class Series(BaseQuery):
         # Get all our data first with async
         # Note that all our pandas work will tax CPU so we wouldn't expect any
         # performance gains from doing the data parsing as a callback
-        records = asyncio.run(self.parse())
+        records = self.to_dict()
         data = []
         for series in records:
             df = pd.DataFrame(series.pop("data"), columns=["period", "value"])
@@ -62,7 +66,3 @@ class Series(BaseQuery):
             data.append(df)
         return pd.concat(data, ignore_index=True)
 
-    def to_dict(self) -> List[dict]:
-        """Return the input series as a list of dictionaries.
-        """
-        return asyncio.run(self.parse())
