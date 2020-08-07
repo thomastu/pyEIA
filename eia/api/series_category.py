@@ -11,6 +11,17 @@ class SeriesCategory(Series):
     """
     The SeriesCategory endpoint returns all categories that a given series id belongs to.
 
+    Example:
+
+        .. code-block::python
+
+            from eia.api import SeriesCategory
+
+            SeriesCategory(
+                "AEO.2015.REF2015.CNSM_DEU_TOTD_NA_DEU_NA_ENC_QBTU.A",
+                "AEO.2015.REF2015.CNSM_ENU_ALLS_NA_DFO_DELV_ENC_QBTU.A"
+            ).to_dataframe()
+
     Note:
         Many times, there will be multiple paths to get to a single category.
         A single child series can have multiple nearly identical parents that

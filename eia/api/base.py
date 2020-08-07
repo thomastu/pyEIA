@@ -45,14 +45,14 @@ class BaseQuery(abc.ABC):
         """Asynchronously send a GET request and retrieve a python dict.
         """
         params = {**self._params, **data}
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=10 * 60.0) as client:
             response = await client.get(self.url, params=params)
         return response.json()
 
     async def _post(self, data: dict = {}) -> dict:
         """Asynchronously send a POST request and retrieve a python dict.
         """
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=10 * 60.0) as client:
             response = await client.post(self.url, params=self._params, data=data)
         return response.json()
 
