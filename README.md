@@ -1,3 +1,16 @@
+# Configuration
+
+You can configure pyeia with your API key either at runtime.
+
+- Declare `EIA_APIKEY="myapikey"` in a `.env` file
+- Set an environment variable explicitly, `export EIA_APIKEY="myapikey"`
+- If you are using dynaconf, you can include an `[eia]` environment in your `settings.toml` file (or any other configured settings files.)
+
+```toml
+[eia]
+apikey = "my apikey"
+```
+
 # About
 
 The U.S. Energy Information Adminsitration provides an API for access to commonly used datasets for policy makers

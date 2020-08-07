@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "eia"
+version = "1.0.0"
+description = "Python client for the Energy Information Administration (EIA) API"
+authors = ["Thomas Tu <thomasthetu@gmail.com>"]
+license = "BSD-3-Clause-LBNL"
+homepage = "https://github.com/thomastu/pyEIA"
+repository = "https://github.com/thomastu/pyEIA"
+include = ["README.md"]
+exclude = ["tests"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+requests_cache = "^0.5.2"
+pandas = "^1.1.0"
+click = "^7.1.2"
+orjson = "^3.3.0"
+dynaconf = "^3.0.0"
+httpx = "^0.13.3"
+
+[tool.poetry.dev-dependencies]
+black = "^19.10b0"
+pytest = "^6.0.1"
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
