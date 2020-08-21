@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pyeia"
-version = "0.1.2"
+version = "0.1.3"
 description = "Python client for the Energy Information Administration (EIA) API"
 authors = ["Thomas Tu <thomasthetu@gmail.com>"]
 license = "BSD-3-Clause-LBNL"
