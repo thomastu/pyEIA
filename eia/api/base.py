@@ -5,6 +5,7 @@ import abc
 import httpx
 import itertools
 
+from loguru import logger
 from typing import Iterator, List
 from urllib.parse import urljoin
 
@@ -47,6 +48,11 @@ class BaseQuery(abc.ABC):
         params = {**self._params, **data}
         async with httpx.AsyncClient(timeout=10 * 60.0) as client:
             response = await client.get(self.url, params=params)
+            logger.debug(
+                "Made GET to {url} with parameters\n{params}",
+                url=self.url,
+                params=params,
+            )
         return response.json()
 
     async def _post(self, data: dict = {}) -> dict:
@@ -54,6 +60,12 @@ class BaseQuery(abc.ABC):
         """
         async with httpx.AsyncClient(timeout=10 * 60.0) as client:
             response = await client.post(self.url, params=self._params, data=data)
+            logger.debug(
+                "made POST to {url} with parameters {params} and payload\n{payload}",
+                url=self.url,
+                params=self._params,
+                payload=data,
+            )
         return response.json()
 
     @abc.abstractmethod

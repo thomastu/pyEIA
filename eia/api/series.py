@@ -31,17 +31,22 @@ class Series(BaseQuery):
     async def _get_data(self):
         """Send a request for each batch of series ids and await their results.
         """
+        coros = []
         for series_ids in self.series_ids:
-            response = await self._post(data={"series_id": series_ids})
-            yield response
+            response = self._post(data={"series_id": series_ids})
+            coros.append(response)
+            coros.append(
+                asyncio.sleep(0.25)
+            )  # Rate limit ourselves to 4 requests/second)
+        return filter(None, await asyncio.gather(*coros))
 
     async def parse(self, key) -> List[dict]:
         """
         Collect one dict per series and drop request metadata.
         """
-        data_generator = self._get_data()
+        data = await self._get_data()
         output = []
-        async for group in data_generator:
+        for group in data:
             for series in group.get(key, []):
                 output.append(series)
         return output
