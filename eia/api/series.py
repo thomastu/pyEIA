@@ -32,13 +32,18 @@ class Series(BaseQuery):
         """Send a request for each batch of series ids and await their results.
         """
         coros = []
+        results = []
         for series_ids in self.series_ids:
             response = self._post(data={"series_id": series_ids})
             coros.append(response)
-            coros.append(
-                asyncio.sleep(0.25)
-            )  # Rate limit ourselves to 4 requests/second)
-        return filter(None, await asyncio.gather(*coros))
+            if len(coros) == 5:  # throttle at 5
+                _ = await asyncio.gather(*coros)
+                results.extend(_)
+                coros = []  # Reset accumulator
+        if coros:
+            results.extend(await asyncio.gather(*coros))
+
+        return filter(None, results)
 
     async def parse(self, key) -> List[dict]:
         """
