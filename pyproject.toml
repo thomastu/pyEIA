@@ -1,13 +1,13 @@
 [tool.poetry]
 name = "pyeia"
-version = "0.1.1"
+version = "0.1.2"
 description = "Python client for the Energy Information Administration (EIA) API"
 authors = ["Thomas Tu <thomasthetu@gmail.com>"]
 license = "BSD-3-Clause-LBNL"
 homepage = "https://github.com/thomastu/pyEIA"
 repository = "https://github.com/thomastu/pyEIA"
-include = ["README.md"]
-exclude = ["tests"]
+readme = "README.md"
+exclude = []
 packages = [
     {include = "eia"},
 ]
