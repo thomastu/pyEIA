@@ -24,7 +24,7 @@ Since this package is still under active development, it has not been pushed to 
 stable and reliable enough for immediate use.  You can install this via git+https, i.e. :
 
 ```bash
-pip install git+https://github.com/thomastu/pyEIA.git
+pip install pyeia
 pip show pyeia
 ```
 
