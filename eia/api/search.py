@@ -42,7 +42,7 @@ class Search(BaseQuery):
 
     endpoint = "search"
 
-    def __init__(self, search_term, search_value, apikey: str = None):
+    def __init__(self, apikey: str = None):
         super().__init__(apikey)
 
     def _send_search_query(
@@ -65,25 +65,26 @@ class Search(BaseQuery):
                     "search_value": search_value,
                     "search_term": search_term,
                 },
+                timeout=10.0,
             )
             response.raise_for_status()
-            num_rows = response["response"]["numFound"]
+            num_rows = response.json()["response"]["numFound"]
         pages = ceil(num_rows / chunksize)
         search_results = []
         for page in range(pages):
             offset = page * chunksize
-            pagesize = num_rows
+            pagesize = chunksize
             if offset + chunksize > num_rows:
                 pagesize = num_rows - offset
             params = {
                 "page_num": page,
-                "rows_per_page": pagesize,
+                "rows_per_page": chunksize,
                 "search_term": search_term,
                 "search_value": search_value,
             }
-            results = httpx.get(self.url, params=params)
+            results = httpx.get(self.url, params=params, timeout=10.0)
             results.raise_for_status()
-            yield results["response"]["docs"]
+            yield results.json()["response"]["docs"]
 
     def to_dict(self, *args, **kwargs):
         return list(self._send_search_query(*args, **kwargs))
