@@ -8,10 +8,9 @@ homepage = "https://github.com/thomastu/pyEIA"
 repository = "https://github.com/thomastu/pyEIA"
 include = ["README.md"]
 exclude = ["tests"]
-
-
-[package]
-include = ["eia"]
+packages = [
+    {include = "eia"},
+]
 
 [tool.poetry.dependencies]
 python = "^3.8"
