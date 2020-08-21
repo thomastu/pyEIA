@@ -26,7 +26,9 @@ class Series(BaseQuery):
 
     def __init__(self, *series_ids: str, apikey: str = None):
         super().__init__(apikey)
-        self.series_ids = [";".join(chunk) for chunk in yield_chunks(series_ids, 100)]
+        self.series_ids = [
+            ";".join(chunk) for chunk in yield_chunks(filter(None, series_ids), 100)
+        ]
 
     async def _get_data(self):
         """Send a request for each batch of series ids and await their results.
