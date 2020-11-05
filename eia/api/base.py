@@ -6,7 +6,7 @@ import httpx
 import itertools
 
 from loguru import logger
-from typing import Iterator, List
+from typing import Iterator
 from urllib.parse import urljoin
 
 from eia import settings
