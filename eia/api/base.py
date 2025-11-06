@@ -1,15 +1,37 @@
 """
 Core documentation for the EIA API can be found at: https://www.eia.gov/opendata/commands.php
+
+DEPRECATION WARNING: This module uses the deprecated EIA API v1.
+Please migrate to the new v2 API using `from eia import EIAClient`.
+The v1 API will be removed in a future version.
 """
 import abc
+import warnings
 import httpx
 import itertools
 
-from loguru import logger
 from typing import Iterator
 from urllib.parse import urljoin
 
-from eia import settings
+# Issue deprecation warning when this module is imported
+warnings.warn(
+    "The EIA API v1 is deprecated and will be removed in a future version. "
+    "Please migrate to the v2 API: from eia import EIAClient. "
+    "See https://github.com/thomastu/pyEIA for migration guide.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+try:
+    from loguru import logger
+except ImportError:
+    import logging
+    logger = logging.getLogger(__name__)
+
+try:
+    from eia import settings
+except ImportError:
+    settings = None  # type: ignore
 
 
 def yield_chunks(iterator: Iterator, n: int) -> Iterator:
@@ -32,7 +54,10 @@ class BaseQuery(abc.ABC):
         """Set instance API key, default parameters and base url.
         """
         # Set authentication
-        self.apikey = apikey or settings.APIKEY
+        if settings:
+            self.apikey = apikey or settings.APIKEY
+        else:
+            self.apikey = apikey
         assert self.apikey, "Missing required apikey."
 
         # Set default API parameters

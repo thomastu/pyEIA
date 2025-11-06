@@ -4,11 +4,12 @@ Modern, fully-typed EIA API v2 client with sync and async support.
 This client provides a clean, type-safe interface to the EIA API v2 with
 support for bulk data ingestion and integration with modern data tools.
 
-Uses only standard library types for zero-overhead performance.
+Features retry logic with exponential backoff and composable iterators.
 """
 
 from typing import Any
 from urllib.parse import urljoin
+from collections.abc import Iterator
 
 import httpx
 
@@ -22,6 +23,7 @@ from eia.v2.models import (
     FrequencyType,
     SortDirection,
 )
+from eia.v2.retry import RetryConfig, with_retry, paginate_data, batch_iterator
 
 
 class BaseEIAClient:
@@ -36,6 +38,7 @@ class BaseEIAClient:
         api_key: str,
         timeout: float | None = None,
         base_url: str | None = None,
+        retry_config: RetryConfig | None = None,
     ) -> None:
         """
         Initialize the EIA API client.
@@ -44,6 +47,7 @@ class BaseEIAClient:
             api_key: Your EIA API key (get one at https://www.eia.gov/opendata/register.php)
             timeout: Request timeout in seconds (default: 60.0)
             base_url: Base URL for the API (default: https://api.eia.gov/v2/)
+            retry_config: Retry configuration (default: 3 retries with exponential backoff)
         """
         if not api_key:
             raise EIAValidationError("API key is required")
@@ -51,6 +55,7 @@ class BaseEIAClient:
         self.api_key = api_key
         self.timeout = timeout or self.DEFAULT_TIMEOUT
         self.base_url = base_url or self.BASE_URL
+        self.retry_config = retry_config or RetryConfig()
 
     def _build_url(self, route: str) -> str:
         """Build the full URL for a given route."""
@@ -171,9 +176,10 @@ class EIAClient(BaseEIAClient):
         api_key: str,
         timeout: float | None = None,
         base_url: str | None = None,
+        retry_config: RetryConfig | None = None,
     ) -> None:
         """Initialize synchronous EIA API client."""
-        super().__init__(api_key, timeout, base_url)
+        super().__init__(api_key, timeout, base_url, retry_config)
         self._client: httpx.Client | None = None
 
     def __enter__(self) -> "EIAClient":
@@ -192,6 +198,30 @@ class EIAClient(BaseEIAClient):
         if self._client is None:
             self._client = httpx.Client(timeout=self.timeout)
         return self._client
+
+    def _make_request(self, url: str, params: dict[str, Any]) -> httpx.Response:
+        """
+        Make an HTTP request with retry logic.
+
+        Args:
+            url: Request URL
+            params: Query parameters
+
+        Returns:
+            HTTP response
+
+        Raises:
+            EIAAPIError: If the request fails after all retries
+        """
+
+        @with_retry(self.retry_config)
+        def request() -> httpx.Response:
+            client = self._get_client()
+            response = client.get(url, params=params)
+            response.raise_for_status()
+            return response
+
+        return request()
 
     def get_data(
         self,
@@ -247,13 +277,12 @@ class EIAClient(BaseEIAClient):
             **kwargs,
         )
 
-        client = self._get_client()
-        response = client.get(url, params=params)
-
-        if response.status_code != 200:
-            self._handle_error_response(response)
-
-        return response.json()  # type: ignore
+        try:
+            response = self._make_request(url, params)
+            return response.json()  # type: ignore
+        except httpx.HTTPStatusError as e:
+            self._handle_error_response(e.response)
+            raise  # Should not reach here
 
     def get_facet(
         self,
@@ -283,13 +312,12 @@ class EIAClient(BaseEIAClient):
         url = self._build_url(f"{route}/facet/{facet}")
         params = {"api_key": self.api_key, **kwargs}
 
-        client = self._get_client()
-        response = client.get(url, params=params)
-
-        if response.status_code != 200:
-            self._handle_error_response(response)
-
-        return response.json()  # type: ignore
+        try:
+            response = self._make_request(url, params)
+            return response.json()  # type: ignore
+        except httpx.HTTPStatusError as e:
+            self._handle_error_response(e.response)
+            raise
 
     def get_route(
         self,
@@ -320,13 +348,12 @@ class EIAClient(BaseEIAClient):
         url = self._build_url(route) if route else self.base_url
         params = {"api_key": self.api_key, **kwargs}
 
-        client = self._get_client()
-        response = client.get(url, params=params)
-
-        if response.status_code != 200:
-            self._handle_error_response(response)
-
-        return response.json()  # type: ignore
+        try:
+            response = self._make_request(url, params)
+            return response.json()  # type: ignore
+        except httpx.HTTPStatusError as e:
+            self._handle_error_response(e.response)
+            raise
 
     def get_series(
         self,
@@ -350,13 +377,72 @@ class EIAClient(BaseEIAClient):
         url = self._build_url(f"seriesid/{series_id}")
         params = {"api_key": self.api_key, **kwargs}
 
-        client = self._get_client()
-        response = client.get(url, params=params)
+        try:
+            response = self._make_request(url, params)
+            return response.json()  # type: ignore
+        except httpx.HTTPStatusError as e:
+            self._handle_error_response(e.response)
+            raise
 
-        if response.status_code != 200:
-            self._handle_error_response(response)
+    def iter_data(
+        self,
+        route: str,
+        frequency: FrequencyType | str | None = None,
+        data: list[str] | None = None,
+        facets: dict[str, list[str] | str] | None = None,
+        start: str | None = None,
+        end: str | None = None,
+        sort: list[tuple[str, SortDirection | str]] | None = None,
+        max_rows: int | None = None,
+        max_pages: int | None = None,
+        **kwargs: Any,
+    ) -> Iterator[dict[str, Any]]:
+        """
+        Iterate through data records with automatic pagination.
 
-        return response.json()  # type: ignore
+        This is a composable iterator that yields individual records.
+        Use this for memory-efficient processing of large datasets.
+
+        Args:
+            route: API route
+            frequency: Data frequency
+            data: List of data columns to retrieve
+            facets: Dictionary of facet filters
+            start: Start period
+            end: End period
+            sort: List of (column, direction) tuples for sorting
+            max_rows: Maximum total rows to fetch
+            max_pages: Maximum number of pages to fetch
+            **kwargs: Additional parameters
+
+        Yields:
+            Individual data records
+
+        Example:
+            >>> for record in client.iter_data(route="electricity/retail-sales", data=["price"]):
+            ...     print(record['period'], record['price'])
+        """
+
+        def fetch_page(offset: int, length: int) -> dict[str, Any]:
+            return self.get_data(
+                route=route,
+                frequency=frequency,
+                data=data,
+                facets=facets,
+                start=start,
+                end=end,
+                sort=sort,
+                offset=offset,
+                length=length,
+                **kwargs,
+            )
+
+        yield from paginate_data(
+            fetch_page=fetch_page,
+            page_size=self.MAX_ROWS,
+            max_rows=max_rows,
+            max_pages=max_pages,
+        )
 
     def get_all_data(
         self,
@@ -368,14 +454,14 @@ class EIAClient(BaseEIAClient):
         end: str | None = None,
         sort: list[tuple[str, SortDirection | str]] | None = None,
         max_rows: int | None = None,
+        max_pages: int | None = None,
         **kwargs: Any,
     ) -> list[dict[str, Any]]:
         """
         Get all data with automatic pagination for bulk ingestion.
 
-        This method automatically handles pagination to retrieve all available
-        data, making it ideal for bulk data ingestion into systems like
-        DuckDB or Iceberg.
+        This method collects all records into a list. For large datasets,
+        consider using iter_data() for memory efficiency.
 
         Args:
             route: API route
@@ -386,6 +472,7 @@ class EIAClient(BaseEIAClient):
             end: End period
             sort: List of (column, direction) tuples for sorting
             max_rows: Maximum total rows to retrieve (None for all)
+            max_pages: Maximum number of pages to fetch (None for all)
             **kwargs: Additional parameters
 
         Returns:
@@ -402,12 +489,8 @@ class EIAClient(BaseEIAClient):
             >>> # import duckdb
             >>> # duckdb.query("SELECT * FROM records").show()
         """
-        all_data: list[dict[str, Any]] = []
-        offset = 0
-        length = self.MAX_ROWS
-
-        while True:
-            response = self.get_data(
+        return list(
+            self.iter_data(
                 route=route,
                 frequency=frequency,
                 data=data,
@@ -415,28 +498,11 @@ class EIAClient(BaseEIAClient):
                 start=start,
                 end=end,
                 sort=sort,
-                offset=offset,
-                length=length,
+                max_rows=max_rows,
+                max_pages=max_pages,
                 **kwargs,
             )
-
-            all_data.extend(response["response"]["data"])
-
-            # Check if we've reached the end or hit max_rows limit
-            if max_rows and len(all_data) >= max_rows:
-                return all_data[:max_rows]
-
-            if len(response["response"]["data"]) < length:
-                # We've gotten all the data
-                break
-
-            if offset + length >= response["response"]["total"]:
-                # We've reached the total
-                break
-
-            offset += length
-
-        return all_data
+        )
 
     def close(self) -> None:
         """Close the HTTP client."""
@@ -464,9 +530,10 @@ class AsyncEIAClient(BaseEIAClient):
         api_key: str,
         timeout: float | None = None,
         base_url: str | None = None,
+        retry_config: RetryConfig | None = None,
     ) -> None:
         """Initialize asynchronous EIA API client."""
-        super().__init__(api_key, timeout, base_url)
+        super().__init__(api_key, timeout, base_url, retry_config)
         self._client: httpx.AsyncClient | None = None
 
     async def __aenter__(self) -> "AsyncEIAClient":
@@ -485,6 +552,46 @@ class AsyncEIAClient(BaseEIAClient):
         if self._client is None:
             self._client = httpx.AsyncClient(timeout=self.timeout)
         return self._client
+
+    async def _make_request(self, url: str, params: dict[str, Any]) -> httpx.Response:
+        """
+        Make an async HTTP request with retry logic.
+
+        Args:
+            url: Request URL
+            params: Query parameters
+
+        Returns:
+            HTTP response
+        """
+        import asyncio
+        from functools import wraps
+
+        # Create async retry wrapper
+        @wraps(self._make_request)
+        async def request_with_retry() -> httpx.Response:
+            last_error: Exception | None = None
+
+            for attempt in range(self.retry_config.max_attempts):
+                try:
+                    client = self._get_client()
+                    response = await client.get(url, params=params)
+                    response.raise_for_status()
+                    return response
+                except Exception as e:
+                    last_error = e
+                    if not self.retry_config.should_retry(e):
+                        raise
+
+                    if attempt < self.retry_config.max_attempts - 1:
+                        delay = self.retry_config.calculate_delay(attempt)
+                        await asyncio.sleep(delay)
+
+            if last_error:
+                raise last_error
+            raise RuntimeError("Retry logic failed unexpectedly")
+
+        return await request_with_retry()
 
     async def get_data(
         self,
@@ -517,13 +624,12 @@ class AsyncEIAClient(BaseEIAClient):
             **kwargs,
         )
 
-        client = self._get_client()
-        response = await client.get(url, params=params)
-
-        if response.status_code != 200:
-            self._handle_error_response(response)
-
-        return response.json()  # type: ignore
+        try:
+            response = await self._make_request(url, params)
+            return response.json()  # type: ignore
+        except httpx.HTTPStatusError as e:
+            self._handle_error_response(e.response)
+            raise
 
     async def get_facet(
         self,
@@ -539,13 +645,12 @@ class AsyncEIAClient(BaseEIAClient):
         url = self._build_url(f"{route}/facet/{facet}")
         params = {"api_key": self.api_key, **kwargs}
 
-        client = self._get_client()
-        response = await client.get(url, params=params)
-
-        if response.status_code != 200:
-            self._handle_error_response(response)
-
-        return response.json()  # type: ignore
+        try:
+            response = await self._make_request(url, params)
+            return response.json()  # type: ignore
+        except httpx.HTTPStatusError as e:
+            self._handle_error_response(e.response)
+            raise
 
     async def get_route(
         self,
@@ -560,13 +665,12 @@ class AsyncEIAClient(BaseEIAClient):
         url = self._build_url(route) if route else self.base_url
         params = {"api_key": self.api_key, **kwargs}
 
-        client = self._get_client()
-        response = await client.get(url, params=params)
-
-        if response.status_code != 200:
-            self._handle_error_response(response)
-
-        return response.json()  # type: ignore
+        try:
+            response = await self._make_request(url, params)
+            return response.json()  # type: ignore
+        except httpx.HTTPStatusError as e:
+            self._handle_error_response(e.response)
+            raise
 
     async def get_series(
         self,
@@ -581,13 +685,85 @@ class AsyncEIAClient(BaseEIAClient):
         url = self._build_url(f"seriesid/{series_id}")
         params = {"api_key": self.api_key, **kwargs}
 
-        client = self._get_client()
-        response = await client.get(url, params=params)
+        try:
+            response = await self._make_request(url, params)
+            return response.json()  # type: ignore
+        except httpx.HTTPStatusError as e:
+            self._handle_error_response(e.response)
+            raise
 
-        if response.status_code != 200:
-            self._handle_error_response(response)
+    async def iter_data(
+        self,
+        route: str,
+        frequency: FrequencyType | str | None = None,
+        data: list[str] | None = None,
+        facets: dict[str, list[str] | str] | None = None,
+        start: str | None = None,
+        end: str | None = None,
+        sort: list[tuple[str, SortDirection | str]] | None = None,
+        max_rows: int | None = None,
+        max_pages: int | None = None,
+        **kwargs: Any,
+    ) -> list[dict[str, Any]]:
+        """
+        Asynchronously iterate through data with pagination.
 
-        return response.json()  # type: ignore
+        Note: Async generators are returned as lists for simplicity.
+        See EIAClient.iter_data for full documentation.
+        """
+        offset = 0
+        total_fetched = 0
+        pages_fetched = 0
+        all_data: list[dict[str, Any]] = []
+
+        # Use explicit bounds instead of while True
+        max_iterations = max_pages if max_pages else 1000
+
+        for _ in range(max_iterations):
+            # Check page limit
+            if max_pages and pages_fetched >= max_pages:
+                break
+
+            # Adjust page size if we're near max_rows
+            current_page_size = self.MAX_ROWS
+            if max_rows:
+                remaining = max_rows - total_fetched
+                if remaining <= 0:
+                    break
+                current_page_size = min(self.MAX_ROWS, remaining)
+
+            # Fetch the page
+            response = await self.get_data(
+                route=route,
+                frequency=frequency,
+                data=data,
+                facets=facets,
+                start=start,
+                end=end,
+                sort=sort,
+                offset=offset,
+                length=current_page_size,
+                **kwargs,
+            )
+
+            data_items = response["response"]["data"]
+
+            # No more data available
+            if not data_items:
+                break
+
+            all_data.extend(data_items)
+            total_fetched += len(data_items)
+
+            # Check if we've fetched all available data
+            total_available = response["response"].get("total", 0)
+            if offset + len(data_items) >= total_available:
+                break
+
+            offset += len(data_items)
+            pages_fetched += 1
+
+        return all_data
 
     async def get_all_data(
         self,
@@ -599,6 +775,7 @@ class AsyncEIAClient(BaseEIAClient):
         end: str | None = None,
         sort: list[tuple[str, SortDirection | str]] | None = None,
         max_rows: int | None = None,
+        max_pages: int | None = None,
         **kwargs: Any,
     ) -> list[dict[str, Any]]:
         """
@@ -606,39 +783,18 @@ class AsyncEIAClient(BaseEIAClient):
 
         See EIAClient.get_all_data for full documentation.
         """
-        all_data: list[dict[str, Any]] = []
-        offset = 0
-        length = self.MAX_ROWS
-
-        while True:
-            response = await self.get_data(
-                route=route,
-                frequency=frequency,
-                data=data,
-                facets=facets,
-                start=start,
-                end=end,
-                sort=sort,
-                offset=offset,
-                length=length,
-                **kwargs,
-            )
-
-            all_data.extend(response["response"]["data"])
-
-            # Check if we've reached the end or hit max_rows limit
-            if max_rows and len(all_data) >= max_rows:
-                return all_data[:max_rows]
-
-            if len(response["response"]["data"]) < length:
-                break
-
-            if offset + length >= response["response"]["total"]:
-                break
-
-            offset += length
-
-        return all_data
+        return await self.iter_data(
+            route=route,
+            frequency=frequency,
+            data=data,
+            facets=facets,
+            start=start,
+            end=end,
+            sort=sort,
+            max_rows=max_rows,
+            max_pages=max_pages,
+            **kwargs,
+        )
 
     async def close(self) -> None:
         """Close the async HTTP client."""

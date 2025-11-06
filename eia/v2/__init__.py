@@ -14,6 +14,7 @@ from eia.v2.models import (
     FrequencyType,
 )
 from eia.v2.exceptions import EIAError, EIAAPIError, EIAValidationError
+from eia.v2.retry import RetryConfig, paginate_data, batch_iterator
 
 __all__ = [
     "EIAClient",
@@ -26,4 +27,7 @@ __all__ = [
     "EIAError",
     "EIAAPIError",
     "EIAValidationError",
+    "RetryConfig",
+    "paginate_data",
+    "batch_iterator",
 ]

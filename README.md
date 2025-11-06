@@ -7,13 +7,26 @@ Modern, fully-typed Python client for the U.S. Energy Information Administration
 
 ## Features
 
+### Core Client
 - **Fully Typed**: Complete type safety using modern Python type hints (TypedDict)
 - **Sync & Async**: Both synchronous and asynchronous interfaces
 - **Zero Runtime Overhead**: Uses standard library types for maximum performance
 - **Minimal Dependencies**: Only requires `httpx` for HTTP requests
-- **Bulk Data Support**: Built-in pagination for large-scale data ingestion
-- **Modern Python**: Leverages Python 3.10+ features for clean, expressive code
-- **Well Tested**: Comprehensive test suite with property-based testing
+- **Robust Error Handling**: Automatic retries with exponential backoff
+- **Composable**: Iterator-based pagination, batch processing utilities
+- **Well Tested**: 46 tests including property-based testing with Hypothesis
+
+### CLI Browser
+- **Beautiful Interface**: Rich terminal UI for exploring the EIA API
+- **Interactive Navigation**: Browse datasets, facets, and metadata
+- **Data Export**: Quick CSV exports from the terminal
+- **Install**: `pip install pyeia[cli]` and run `pyeia-browser`
+
+### ETL Module
+- **Parquet Export**: Direct export to Apache Parquet format
+- **Iceberg Support**: Write to Apache Iceberg tables
+- **Batch Processing**: Memory-efficient streaming for large datasets
+- **Install**: `pip install pyeia[etl]`
 
 ## Installation
 
@@ -29,9 +42,19 @@ Or with pip:
 pip install pyeia
 ```
 
-For development:
+**Optional Features:**
 
 ```bash
+# CLI browser
+pip install pyeia[cli]
+
+# ETL tools (Parquet/Iceberg)
+pip install pyeia[etl]
+
+# Everything
+pip install pyeia[all]
+
+# Development
 uv pip install -e ".[dev]"
 ```
 
@@ -166,7 +189,73 @@ import duckdb
 duckdb.query("SELECT * FROM all_data WHERE price > 100").show()
 ```
 
-### 5. Legacy Series ID Support
+### 5. Iterator-Based Data Access
+
+For memory-efficient processing of large datasets:
+
+```python
+# Stream data without loading everything into memory
+for record in client.iter_data(
+    route="electricity/retail-sales",
+    data=["price", "revenue"],
+    frequency="monthly",
+    max_rows=1000000,  # Process millions of records
+):
+    process_record(record)  # Process one at a time
+
+# Or use batching
+from eia.v2 import batch_iterator
+
+for batch in batch_iterator(client.iter_data(...), batch_size=10000):
+    bulk_insert_to_database(batch)
+```
+
+### 6. CLI Browser
+
+Explore the EIA API interactively:
+
+```bash
+# Install CLI tools
+pip install pyeia[cli]
+
+# Launch browser
+pyeia-browser
+
+# Set API key as environment variable
+export EIA_API_KEY="your_key_here"
+pyeia-browser
+```
+
+### 7. ETL / Data Export
+
+Export data to modern formats:
+
+```python
+from eia import EIAClient
+from eia.etl import to_parquet, to_iceberg
+
+client = EIAClient(api_key="your_key")
+
+# Get data as iterator for memory efficiency
+data = client.iter_data(
+    route="electricity/retail-sales",
+    data=["price", "revenue", "sales"],
+    frequency="monthly",
+)
+
+# Export to Parquet
+to_parquet(data, "electricity_data.parquet", compression="zstd")
+
+# Or export to Iceberg
+to_iceberg(
+    data,
+    catalog_name="my_catalog",
+    namespace="eia",
+    table_name="retail_sales",
+)
+```
+
+### 8. Legacy Series ID Support
 
 For backwards compatibility with API v1:
 
@@ -191,13 +280,24 @@ with EIAClient(api_key="your_api_key") as client:
     # Client is automatically closed when exiting context
 ```
 
-### Custom Timeout
+### Custom Timeout and Retries
 
 ```python
-# Set custom timeout for slow connections
+from eia import EIAClient
+from eia.v2 import RetryConfig
+
+# Configure custom timeout and retry behavior
+retry_config = RetryConfig(
+    max_attempts=5,  # Retry up to 5 times
+    base_delay=2.0,  # Start with 2 second delay
+    max_delay=60.0,  # Cap delay at 60 seconds
+    retry_on_status={429, 500, 502, 503, 504},  # Which HTTP codes to retry
+)
+
 client = EIAClient(
     api_key="your_api_key",
-    timeout=120.0  # 2 minutes
+    timeout=120.0,  # 2 minute timeout
+    retry_config=retry_config,
 )
 ```
 
