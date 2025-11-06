@@ -1,8 +1,55 @@
+"""Python client for the Energy Information Administration (EIA) API."""
+
+from __future__ import annotations
+
 from importlib import metadata
-from loguru import logger
 
-__version__ = metadata.version("pyeia")
+from eia.config import EIAConfig
+from eia.constants import Category
+from eia.eia_client import EIA
+from eia.endpoints import (
+    CategoryEndpoint,
+    GeosetEndpoint,
+    SearchEndpoint,
+    SeriesCategoryEndpoint,
+    SeriesEndpoint,
+    UpdatesEndpoint,
+)
+from eia.models import (
+    CategoryData,
+    ChildCategory,
+    ChildSeries,
+    GeosetRegion,
+    SearchResult,
+    SeriesData,
+    UpdateResult,
+)
 
-# Do not pass logs to application; it is always possible to enable logging
-# at the application level, e.g. logger.enable("eia")
-logger.disable(__name__)
+try:
+    __version__ = metadata.version("pyeia")
+except metadata.PackageNotFoundError:
+    __version__ = "unknown"
+
+__all__ = [
+    # Main client
+    "EIA",
+    # Configuration
+    "EIAConfig",
+    # Constants
+    "Category",
+    # Endpoints (for advanced usage)
+    "SeriesEndpoint",
+    "CategoryEndpoint",
+    "GeosetEndpoint",
+    "SearchEndpoint",
+    "UpdatesEndpoint",
+    "SeriesCategoryEndpoint",
+    # Models
+    "SeriesData",
+    "CategoryData",
+    "ChildCategory",
+    "ChildSeries",
+    "GeosetRegion",
+    "SearchResult",
+    "UpdateResult",
+]
