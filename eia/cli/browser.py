@@ -277,11 +277,28 @@ def fetch_data_interactive(
     console.print(f"\n[bold blue]Fetch Data from: {route}[/bold blue]\n")
 
     # Show available data columns
+    # API returns data in two formats:
+    # - dict: {"column_name": {"alias": "...", ...}}
+    # - list: ["column1", "column2", ...]
     data_cols = route_info.get("data", {})
+    column_names: list[str] = []
+
     if data_cols:
         console.print("[bold]Available data columns:[/bold]")
-        for col_name, col_info in data_cols.items():
-            console.print(f"  • {col_name}: {col_info.get('alias', col_name)}")
+        if isinstance(data_cols, dict):
+            # Dictionary format with metadata
+            for col_name, col_info in data_cols.items():
+                if isinstance(col_info, dict):
+                    alias = col_info.get("alias", col_name)
+                    console.print(f"  • {col_name}: {alias}")
+                else:
+                    console.print(f"  • {col_name}")
+                column_names.append(col_name)
+        elif isinstance(data_cols, list):
+            # List format (just column names)
+            for col_name in data_cols:
+                console.print(f"  • {col_name}")
+                column_names.append(col_name)
         console.print()
 
     # Prompt for data columns
@@ -291,13 +308,16 @@ def fetch_data_interactive(
     )
 
     if data_input.lower() == "all":
-        data_columns = list(data_cols.keys()) if data_cols else None
+        data_columns = column_names if column_names else None
     else:
         data_columns = [c.strip() for c in data_input.split(",")]
 
     # Prompt for frequency
     frequencies = route_info.get("frequency", [])
     if frequencies:
+        # Ensure frequencies is a list
+        if not isinstance(frequencies, list):
+            frequencies = [frequencies]
         console.print(f"\n[bold]Available frequencies:[/bold] {', '.join(frequencies)}")
         frequency = Prompt.ask("Frequency", choices=frequencies, default=frequencies[0])
     else:
@@ -305,11 +325,15 @@ def fetch_data_interactive(
 
     # Prompt for filters
     facets_dict = {}
-    if route_info.get("facets"):
+    facets = route_info.get("facets", [])
+    if facets:
+        # Ensure facets is a list
+        if not isinstance(facets, list):
+            facets = [facets]
         use_filters = Confirm.ask("\nApply filters?", default=False)
         if use_filters:
             console.print("[dim]Enter filter values (e.g., 'CA,NY' for states)[/dim]")
-            for facet in route_info["facets"]:
+            for facet in facets:
                 values = Prompt.ask(f"  {facet} (leave empty to skip)", default="")
                 if values:
                     facets_dict[facet] = [v.strip() for v in values.split(",")]
@@ -339,6 +363,12 @@ def fetch_data_interactive(
             )
         except EIAError as e:
             console.print(f"[red]Error: {e}[/red]")
+            Prompt.ask("\nPress Enter to continue")
+            return
+        except Exception as e:
+            console.print(f"[red]Unexpected error: {e}[/red]")
+            console.print("[dim]This may indicate an API issue or invalid parameters.[/dim]")
+            Prompt.ask("\nPress Enter to continue")
             return
 
     # Display data
