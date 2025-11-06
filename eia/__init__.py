@@ -1,8 +1,40 @@
-from importlib import metadata
-from loguru import logger
+"""
+pyEIA - Modern Python client for the U.S. Energy Information Administration API.
 
-__version__ = metadata.version("pyeia")
+This package provides both v1 (deprecated) and v2 (current) API clients.
+For new projects, use the v2 client.
+"""
 
-# Do not pass logs to application; it is always possible to enable logging
-# at the application level, e.g. logger.enable("eia")
-logger.disable(__name__)
+try:
+    from importlib import metadata
+    __version__ = metadata.version("pyeia")
+except Exception:
+    __version__ = "2.0.0"
+
+# Export v2 client as the default
+from eia.v2 import (
+    EIAClient,
+    AsyncEIAClient,
+    DataResponse,
+    FacetResponse,
+    RouteResponse,
+    ErrorResponse,
+    FrequencyType,
+    EIAError,
+    EIAAPIError,
+    EIAValidationError,
+)
+
+__all__ = [
+    "__version__",
+    "EIAClient",
+    "AsyncEIAClient",
+    "DataResponse",
+    "FacetResponse",
+    "RouteResponse",
+    "ErrorResponse",
+    "FrequencyType",
+    "EIAError",
+    "EIAAPIError",
+    "EIAValidationError",
+]
